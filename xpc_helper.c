@@ -50,6 +50,14 @@
 
 #include "launchctl.h"
 
+#ifdef HAVE_CONFIG_H
+#   include <config.h>
+#else
+#define HAVE__XPC_PIPE_INTERFACE_ROUTINE 1
+#define HAVE_XPC_USER_SESSIONS_ENABLED 1
+#define HAVE_XPC_USER_SESSIONS_GET_FOREGROUND_UID 1
+#endif
+
 int
 launchctl_send_xpc_to_launchd(uint64_t routine, xpc_object_t msg, xpc_object_t *reply)
 {
@@ -63,9 +71,12 @@ launchctl_send_xpc_to_launchd(uint64_t routine, xpc_object_t msg, xpc_object_t *
 	xpc_dictionary_set_uint64(msg, "routine", routine);
 	int ret = 0;
 
+#ifdef HAVE__XPC_PIPE_INTERFACE_ROUTINE
 	if (__builtin_available(macOS 12.0, iOS 15.0, tvOS 15.0, watchOS 8.0, *)) {
 		ret = _xpc_pipe_interface_routine(bootstrap_pipe, 0, msg, reply, 0);
-	} else {
+	} else 
+#endif
+	{
 		ret = xpc_pipe_routine(bootstrap_pipe, msg, reply);
 	}
 	if (ret == 0 && (ret = xpc_dictionary_get_int64(*reply, "error")) == 0)
@@ -172,6 +183,8 @@ launchctl_setup_xpc_dict_for_service_name(char *servicetarget, xpc_object_t dict
 			if (name != NULL) {
 				*name = split[1];
 			}
+#ifdef HAVE_XPC_USER_SESSIONS_ENABLED
+#	ifdef HAVE_XPC_USER_SESSIONS_GET_FOREGROUND_UID
 			if (__builtin_available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)) {
 				if (xpc_user_sessions_enabled() && launchctl_test_xpc_send(1, handle, split[1]) == false) {
 					uint64_t fguid = xpc_user_sessions_get_foreground_uid(0);
@@ -182,11 +195,15 @@ launchctl_setup_xpc_dict_for_service_name(char *servicetarget, xpc_object_t dict
 					}
 				}
 			}
+#	endif //HAVE_XPC_USER_SESSIONS_GET_FOREGROUND_UID
+#endif //HAVE_XPC_USER_SESSIONS_ENABLED
 		}
 		return 0;
 	} else if (strcmp(split[0], "user") == 0) {
 		xpc_dictionary_set_uint64(dict, "type", 2);
 		if (split[1] != NULL && strcmp(split[1], "foreground") == 0) {
+#ifdef HAVE_XPC_USER_SESSIONS_ENABLED
+#	ifdef HAVE_XPC_USER_SESSIONS_GET_FOREGROUND_UID
 			if (__builtin_available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)) {
 				if (xpc_user_sessions_enabled() == 0) {
 					fprintf(stderr, "user/foreground/ specifier is not supported on this platform\n");
@@ -194,6 +211,8 @@ launchctl_setup_xpc_dict_for_service_name(char *servicetarget, xpc_object_t dict
 				}
 				handle = xpc_user_sessions_get_foreground_uid(0);
 			}
+#	endif //HAVE_XPC_USER_SESSIONS_GET_FOREGROUND_UID
+#endif //HAVE_XPC_USER_SESSIONS_ENABLED
 		}
 	} else if (strcmp(split[0], "session") == 0) {
 		xpc_dictionary_set_uint64(dict, "type", 4);

@@ -34,6 +34,12 @@
 
 #include "launchctl.h"
 
+#ifdef HAVE_CONFIG_H
+#   include <config.h>
+#else
+#define HAVE_LAUNCH_ACTIVE_USER_SWITCH 1
+#endif
+
 int
 userswitch_cmd(xpc_object_t *msg, int argc, char **argv, char **envp, char **apple)
 {
@@ -42,6 +48,7 @@ userswitch_cmd(xpc_object_t *msg, int argc, char **argv, char **envp, char **app
 
 	int ret = ENOTSUP;
 
+#ifdef HAVE_LAUNCH_ACTIVE_USER_SWITCH
 	if (__builtin_available(macOS 12.0, iOS 15.0, tvOS 15.0, watchOS 8.0, *)) {
 		long olduid = 0, newuid = 0;
 
@@ -50,6 +57,7 @@ userswitch_cmd(xpc_object_t *msg, int argc, char **argv, char **envp, char **app
 
 		ret = launch_active_user_switch(olduid, newuid);
 	}
+#endif
 
 	if (ret != 0) {
 		fprintf(stderr, "Failed to perform a user switch: %d: %s\n", ret, xpc_strerror(ret));

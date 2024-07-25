@@ -180,7 +180,11 @@ plist_cmd(xpc_object_t *msg, int argc, char **argv, char **envp, char **apple)
 		plist = get_plist_from_section_32(mapping, wantedSegment, wantedSection);
 	} else if (magic == MH_MAGIC_64) {
 		plist = get_plist_from_section_64(mapping, wantedSegment, wantedSection);
-	} else if (magic == FAT_CIGAM || magic == FAT_CIGAM_64) {
+	} else if (magic == FAT_CIGAM 
+#ifdef FAT_CIGAM_64
+	|| magic == FAT_CIGAM_64
+#endif
+	) {
 		struct fat_header *fatHeader = (struct fat_header *)mapping;
 		uint32_t archCount = ntohl(fatHeader->nfat_arch);
 		void *archTable = (void *)((uintptr_t)fatHeader + sizeof(struct fat_header));
@@ -191,10 +195,12 @@ plist_cmd(xpc_object_t *msg, int argc, char **argv, char **envp, char **apple)
 				struct fat_arch *arch = (struct fat_arch *)((uintptr_t)archTable + (i * sizeof(struct fat_arch)));
 				uint64_t archOffset = ntohl(arch->offset);
 				archMapping = (void *)((uintptr_t)mapping + archOffset);
+#ifdef FAT_CIGAM_64
 			} else if (magic == FAT_CIGAM_64) {
 				struct fat_arch_64 *arch = (struct fat_arch_64 *)((uintptr_t)archTable + (i * sizeof(struct fat_arch_64)));
 				uint64_t archOffset = ntohl(arch->offset);
 				archMapping = (void *)((uintptr_t)mapping + archOffset);
+#endif
 			}
 
 			uint32_t archMagic = *(uint32_t *)archMapping;

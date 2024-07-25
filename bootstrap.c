@@ -36,6 +36,13 @@
 
 #include "launchctl.h"
 
+#ifdef HAVE_CONFIG_H
+#   include <config.h>
+#else
+#define HAVE_XPC_USER_SESSIONS_ENABLED 1
+#define HAVE_XPC_USER_SESSIONS_GET_FOREGROUND_UID 1
+#endif
+
 int
 bootstrap_cmd(xpc_object_t *msg, int argc, char **argv, char **envp, char **apple)
 {
@@ -62,6 +69,8 @@ bootstrap_cmd(xpc_object_t *msg, int argc, char **argv, char **envp, char **appl
 	if (argc > 2) {
 		paths = launchctl_parse_load_unload(0, argc - 2, argv + 2);
 		xpc_dictionary_set_value(dict, "paths", paths);
+#ifdef HAVE_XPC_USER_SESSIONS_ENABLED
+#	ifdef HAVE_XPC_USER_SESSIONS_GET_FOREGROUND_UID
 		if (__builtin_available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)) {
 			if (xpc_dictionary_get_uint64(dict, "type") == 1 && xpc_user_sessions_enabled() != 0) {
 				xpc_array_apply(paths, ^bool (size_t index, xpc_object_t val) {
@@ -78,6 +87,8 @@ bootstrap_cmd(xpc_object_t *msg, int argc, char **argv, char **envp, char **appl
 				});
 			}
 		}
+#	endif //HAVE_XPC_USER_SESSIONS_GET_FOREGROUND_UID
+#endif //HAVE_XPC_USER_SESSIONS_ENABLED
 	}
 	ret = launchctl_send_xpc_to_launchd(XPC_ROUTINE_LOAD, dict, &reply);
 	if (ret != ENODOMAIN) {
@@ -129,6 +140,7 @@ bootout_cmd(xpc_object_t *msg, int argc, char **argv, char **envp, char **apple)
 	if (argc > 2 && name == NULL) {
 		paths = launchctl_parse_load_unload(0, argc - 2, argv + 2);
 		xpc_dictionary_set_value(dict, "paths", paths);
+#ifdef HAVE_XPC_USER_SESSIONS_GET_FOREGROUND_UID
 		if (__builtin_available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)) {
 			if (xpc_dictionary_get_uint64(dict, "type") == 1 && xpc_user_sessions_enabled() != 0) {
 				xpc_array_apply(paths, ^bool (size_t index, xpc_object_t val) {
@@ -145,6 +157,7 @@ bootout_cmd(xpc_object_t *msg, int argc, char **argv, char **envp, char **apple)
 				});
 			}
 		}
+#endif //HAVE_XPC_USER_SESSIONS_GET_FOREGROUND_UID
 	}
 
 	if (__builtin_available(macOS 12.0, iOS 15.0, tvOS 15.0, watchOS 8.0, *)) {
