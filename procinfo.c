@@ -35,6 +35,7 @@
 #include <inttypes.h>
 #include <libproc.h>
 #include <mach/mach_traps.h>
+#include <mach/mach.h>
 #include <signal.h>
 #include <spawn.h>
 #include <stdio.h>
@@ -49,6 +50,10 @@ const char *mach_task_special_port_description(int port);
 /* END <mach/mach/port_descriptions.h> */
 
 #include <sys/proc_info.h>
+
+#ifndef TASK_MAX_SPECIAL_PORT
+#define TASK_MAX_SPECIAL_PORT 11
+#endif
 
 /* #define PRIVATE
    #include <sys/proc_info_private.h> */
@@ -377,7 +382,11 @@ procinfo_cmd(xpc_object_t *msg, int argc, char **argv, char **envp, char **apple
 		if (kr != 0)
 			continue;
 		char *port_info = get_port_type(port);
+#ifdef HAVE_MACH_TASK_SPECIAL_PORT_DESCRIPTION
 		const char *port_description = mach_task_special_port_description(i);
+#else
+		const char *port_description = "<mach_task_special_port_description unavailable>";
+#endif
 		if (port_info[0] == '(') {
 			printf("\ttask-%s port = 0x%x %s\n", port_description, port, port_info);
 		} else {
@@ -612,14 +621,14 @@ procinfo_launchd_info : {
 	dict = xpc_dictionary_create(NULL, NULL, 0);
 	xpc_dictionary_set_int64(dict, "pid", pid);
 
-	if (__builtin_available(macOS 12.0, iOS 15.0, tvOS 15.0, watchOS 8.0, bridgeOS 6.0, *)) {
+	if (__builtin_available(macOS 12.0, iOS 15.0, tvOS 15.0, watchOS 8.0, *)) {
 		addr = launchctl_create_shmem(dict, sz);
 	} else {
 		xpc_dictionary_set_fd(dict, "fd", STDOUT_FILENO);
 	}
 	retval = launchctl_send_xpc_to_launchd(XPC_ROUTINE_PRINT_SERVICE, dict, &reply);
 	if (retval == 0) {
-		if (__builtin_available(macOS 12.0, iOS 15.0, tvOS 15.0, watchOS 8.0, bridgeOS 6.0, *)) {
+		if (__builtin_available(macOS 12.0, iOS 15.0, tvOS 15.0, watchOS 8.0, *)) {
 			launchctl_print_shmem(reply, addr, sz, stdout);
 			vm_deallocate(mach_task_self(), addr, sz);
 		}
@@ -644,7 +653,11 @@ hostinfo_cmd(xpc_object_t *msg, int argc, char **argv, char **envp, char **apple
 		if (retval || !MACH_PORT_VALID(port))
 			continue;
 		char *type = get_port_type(port);
+#ifdef HAVE_MACH_HOST_SPECIAL_PORT_DESCRIPTION
 		printf("host-%s port = 0x%x %s\n", mach_host_special_port_description(i), port, type);
+#else
+		printf("host-<mach_host_special_port_description unavailable> port = 0x%x %s\n", port, type);
+#endif
 		free(type);
 	}
 

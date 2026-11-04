@@ -34,13 +34,22 @@
 #include "launchctl.h"
 #include "xpc_private.h"
 
+#ifdef HAVE_CONFIG_H
+#   include <config.h>
+#else
+#define HAVE_LAUNCH_USERSPACE_REBOOT_WITH_PURPOSE 1
+#endif
+
+
 int
 enter_rem_cmd(xpc_object_t *msg, int argc, char **argv, char **envp, char **apple)
 {
 	int ret = ENOTSUP;
 
-	if (__builtin_available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, bridgeOS 9.0, *))
+#ifdef HAVE_LAUNCH_USERSPACE_REBOOT_WITH_PURPOSE
+	if (__builtin_available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, *))
 		ret = launch_userspace_reboot_with_purpose(4);
+#endif
 
 	if (ret != 0)
 		fprintf(stderr, "Failed to enter REM: %d: %s\n", ret, xpc_strerror(ret));
@@ -53,8 +62,10 @@ enter_rem_dev_cmd(xpc_object_t *msg, int argc, char **argv, char **envp, char **
 {
 	int ret = ENOTSUP;
 
-	if (__builtin_available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, bridgeOS 9.0, *))
+#ifdef HAVE_LAUNCH_USERSPACE_REBOOT_WITH_PURPOSE
+	if (__builtin_available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, *))
 		ret = launch_userspace_reboot_with_purpose(5);
+#endif
 
 	if (ret != 0)
 		fprintf(stderr, "Failed to enter REM (development): %d: %s\n", ret, xpc_strerror(ret));

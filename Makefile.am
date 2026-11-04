@@ -8,6 +8,7 @@ launchctl_LDFLAGS = $(AM_LDFLAGS)
 launchctl_SOURCES = attach.c \
 					blame.c \
 					bootstrap.c \
+					dumpjpcategory.c \
 					enable.c \
 					env.c \
 					error.c \
@@ -22,8 +23,11 @@ launchctl_SOURCES = attach.c \
 					missing.c \
 					plist.c \
 					print.c \
+					procinfo.c \
 					reboot.c \
+					rem.c \
 					remove.c \
+					resolveport.c \
 					runstats.c \
 					start_stop.c \
 					userswitch.c \

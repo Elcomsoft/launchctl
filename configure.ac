@@ -32,7 +32,7 @@ fi
 
 
 # Check for functions
-AC_CHECK_FUNCS([__isPlatformVersionAtLeast _xpc_pipe_interface_routine launch_active_user_switch xpc_user_sessions_enabled xpc_user_sessions_get_foreground_uid])
+AC_CHECK_FUNCS([__isPlatformVersionAtLeast _xpc_pipe_interface_routine launch_active_user_switch launch_userspace_reboot_with_purpose xpc_user_sessions_enabled xpc_user_sessions_get_foreground_uid mach_host_special_port_description mach_task_special_port_description])
 
 AC_CONFIG_FILES([Makefile])
 
