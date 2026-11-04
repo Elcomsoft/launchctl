@@ -28,11 +28,10 @@
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
-
 #include <xpc/xpc.h>
-#include "xpc_private.h"
 
 #include "launchctl.h"
+#include "xpc_private.h"
 
 #ifdef HAVE_CONFIG_H
 #   include <config.h>
@@ -49,13 +48,18 @@ userswitch_cmd(xpc_object_t *msg, int argc, char **argv, char **envp, char **app
 	int ret = ENOTSUP;
 
 #ifdef HAVE_LAUNCH_ACTIVE_USER_SWITCH
-	if (__builtin_available(macOS 12.0, iOS 15.0, tvOS 15.0, watchOS 8.0, *)) {
+	if (__builtin_available(macOS 16.0, iOS 19.0, tvOS 19.0, watchOS 12.0, *)) {
+		/* The code is like this because __builtin_available cannot be combined with other operators */
+	} else if (__builtin_available(macOS 12.0, iOS 15.0, tvOS 15.0, watchOS 8.0, *)) {
 		long olduid = 0, newuid = 0;
 
 		olduid = strtol(argv[1], NULL, 0);
 		newuid = strtol(argv[1], NULL, 0);
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
 		ret = launch_active_user_switch(olduid, newuid);
+#pragma clang diagnostic pop
 	}
 #endif
 

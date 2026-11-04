@@ -2,6 +2,7 @@
 1. [x] bootout
 1. [x] enable
 1. [x] disable
+1. [x] uncache
 1. [x] kickstart
 1. [x] attach
 1. [ ] debug
@@ -11,14 +12,15 @@
 1. [x] print-cache
 1. [x] print-disabled
 1. [x] plist
-1. [ ] procinfo
-1. [ ] hostinfo
-1. [ ] resolveport
+1. [x] procinfo
+1. [x] hostinfo
+1. [x] resolveport
 1. [x] limit
 1. [x] runstats
 1. [x] examine
 1. [x] config
 1. [x] dumpstate
+1. [x] dumpjpcategory
 1. [x] reboot
 1. [x] userswitch
 1. [x] load

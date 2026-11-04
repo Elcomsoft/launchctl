@@ -30,6 +30,7 @@
 
 #include <errno.h>
 #include <inttypes.h>
+#include <mach/mach.h>
 #include <signal.h>
 #include <spawn.h>
 #include <stdbool.h>
@@ -38,18 +39,16 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-
-#include <mach/mach.h>
-
 #include <xpc/xpc.h>
-#include "xpc_private.h"
 
 #include "launchctl.h"
+#include "xpc_private.h"
 
-__SCCSID("@(#)PROGRAM:launchctl  PROJECT:ProcursusTeam/launchctl  VERSION:1.1.1");
+__SCCSID("@(#)PROGRAM:launchctl  PROJECT:ProcursusTeam/launchctl  VERSION:1.2.0");
 
 char launchctl __attribute__((section("__TEXT,__launchctl"))) = 1;
 
+// clang-format off
 // TODO: Improve the help to support showing more information
 // Ex. `launchctl help load`
 static const struct {
@@ -62,6 +61,7 @@ static const struct {
 	{ "bootout", "Tears down a domain or removes a service from a domain.", "<domain-target> [service-path1, service-path2, ...] | <service-target>", bootout_cmd },
 	{ "enable", "Enables an existing service.", "<service-target>", enable_cmd },
 	{ "disable", "Disables an existing service.", "<service-target>", enable_cmd },
+	{ "uncache", "Removes the specified service name from the service cache.", "<service-name>", uncache_cmd },
 	{ "kickstart", "Forces an existing service to start.", "[-k] [-p] <service-target>", kickstart_cmd },
 	{ "attach", "Attach the system's debugger to a service.", "[-k] [-s] [-x] <service-target>", attach_cmd },
 	{ "debug", "Configures the next invocation of a service for debugging.", "<service-target> [--program <program-path>] [--start-suspended] [oc-stack-logging] [--malloc-nano-allocator] [--debug-libraries] [--NSZombie] [--32] [--stdin [path]] [--stdout [path]] [--stderr [path]] [--environment VARIABLE0=value0 VARIABLE1=value1 ...] -- [argv0 argv1 ...]", todo_cmd },
@@ -71,15 +71,19 @@ static const struct {
 	{ "print-cache", "Prints information about the service cache.", NULL, print_cache_cmd },
 	{ "print-disabled", "Prints which services are disabled.", NULL, print_disabled_cmd },
 	{ "plist", "Prints a property list embedded in a binary (targets the Info.plist by default).", "[segment,section] <path>", plist_cmd },
-	{ "procinfo", "Prints port information about a process.", "<pid>", todo_cmd },
-	{ "hostinfo", "Prints port information about the host.", NULL, todo_cmd },
-	{ "resolveport", "Resolves a port name from a process to an endpoint in launchd.", "<owner-pid> <port-name>", todo_cmd },
+	{ "procinfo", "Prints port information about a process.", "<pid>", procinfo_cmd },
+	{ "hostinfo", "Prints port information about the host.", NULL, hostinfo_cmd },
+	{ "resolveport", "Resolves a port name from a process to an endpoint in launchd.", "<owner-pid> <port-name>", resolveport_cmd },
 	{ "limit", "Reads or modifies launchd's resource limits.", "[<limit-name> [<both-limits> | <soft-limit> <hard-limit>]", limit_cmd },
 	{ "runstats", "Prints performance statistics for a service.", "<service-target>", runstats_cmd },
 	{ "examine", "Runs the specified analysis tool against launchd in a non-reentrant manner.", "[<tool> [arg0, arg1, ... , @PID, ...]]", examine_cmd },
 	{ "config", "Modifies persistent configuration parameters for launchd domains.", NULL, config_cmd },
 	{ "dumpstate", "Dumps launchd state to stdout.", NULL, dumpstate_cmd },
+	{ "dump-xsc", "Dumps launchd XPC string caches to stdout.", "<name>", dump_xsc_cmd },
+	{ "dumpjpcategory", "Dumps the jetsam properties category for all services.", NULL, dumpjpcategory_cmd },
 	{ "reboot", "Initiates a system reboot of the specified type.", "[system|halt|obliterate|userspace] [-s]", reboot_cmd },
+	{ "enter-rem", "Enter into Restricted Execution Mode (REM).", NULL, enter_rem_cmd },
+	{ "enter-rem-dev", "Enter into Restricted Execution Mode (REM) in development mode.", NULL, enter_rem_dev_cmd },
 	{ "userswitch", "Initiates a user switch.", "<old-uid> <new-uid>", userswitch_cmd },
 	{ "load", "Bootstraps a service or directory of services.", "<service-path, service-path2, ...>", load_cmd },
 	{ "unload", "Unloads a service or directory of services.", "<service-path, service-path2, ...>", load_cmd },
@@ -101,6 +105,7 @@ static const struct {
 	{ "version", "Prints the launchd version.", NULL, version_cmd },
 	{ "help", "Prints the usage for a given subcommand.", "<subcommand>", help_cmd }
 };
+// clang-format on
 
 int
 main(int argc, char **argv, char **envp, char **apple)
@@ -113,7 +118,7 @@ main(int argc, char **argv, char **envp, char **apple)
 	}
 
 	int ret = 0;
-	int n = sizeof(cmds)/sizeof(cmds[0]);
+	int n = sizeof(cmds) / sizeof(cmds[0]);
 	for (int i = 0; i < n; i++) {
 		if (strcmp(argv[1], cmds[i].name) == 0) {
 			ret = (cmds[i].exec)(&msg, argc - 1, argv + 1, envp, apple);
@@ -145,8 +150,10 @@ finish:
 			fprintf(stderr, "Command is not yet implemented.\n");
 			break;
 		case EBADNAME:
-			fprintf(stderr, "Unrecognized target specifier. <service-target> takes a form of <domain-target>/<service-id>.\n");
-			fprintf(stderr, "Please refer to `man launchctl` for explanation of the <domain-target> specifiers.\n");
+			fprintf(stderr,
+			    "Unrecognized target specifier. <service-target> takes a form of <domain-target>/<service-id>.\n");
+			fprintf(stderr,
+			    "Please refer to `man launchctl` for explanation of the <domain-target> specifiers.\n");
 		case EUSAGE:
 			help_cmd(NULL, argc, argv, NULL, NULL);
 			return 64;
@@ -159,7 +166,7 @@ help_cmd(xpc_object_t *msg, int argc, char **argv, char **envp, char **apple)
 {
 	if (argc > 1) {
 		fprintf(stderr, "Usage: %s ", getprogname());
-		int n = sizeof(cmds)/sizeof(cmds[0]);
+		int n = sizeof(cmds) / sizeof(cmds[0]);
 		for (int i = 0; i < n; i++) {
 			if (strcmp(cmds[i].name, argv[1]) == 0) {
 				fprintf(stderr, "%s %s\n", cmds[i].name, cmds[i].usage == NULL ? "" : cmds[i].usage);
@@ -170,37 +177,38 @@ help_cmd(xpc_object_t *msg, int argc, char **argv, char **envp, char **apple)
 		return 64;
 	}
 	printf("Usage: %s <subcommand> ... | help [subcommand]\n"
-		"Many subcommands take a target specifier that refers to a domain or service\n"
-		"within that domain. The available specifier forms are:\n"
-		"\n"
-		"system/[service-name]\n"
-		"Targets the system-wide domain or service within. Root privileges are required\n"
-		"to make modifications.\n"
-		"\n"
-		"user/<uid>/[service-name]\n"
-		"Targets the user domain or service within. A process running as the target user\n"
-		"may make modifications. Root may modify any user's domain. User domains do not\n"
-		"exist on iOS.\n"
-		"\n"
-		"gui/<uid>/[service-name]\n"
-		"Targets the GUI domain or service within. Each GUI domain is associated with a\n"
-		"user domain, and a process running as the owner of that user domain may make\n"
-		"modifications. Root may modify any GUI domain. GUI domains do not exist on iOS.\n"
-		"\n"
-		"session/<asid>/[service-name]\n"
-		"Targets a session domain or service within. A process running within the target\n"
-		"security audit session may make modifications. Root may modify any session\n"
-		"domain.\n"
-		"\n"
-		"pid/<pid>/[service-name]\n"
-		"Targets a process domain or service within. Only the process which owns the\n"
-		"domain may modify it. Even root may not do so.\n"
-		"\n"
-		"When using a legacy subcommand which manipulates a domain, the target domain is\n"
-		"assumed to be the system domain. On iOS, there is no support for per-user\n"
-		"domains, even though there is a mobile user.\n", getprogname());
+	       "Many subcommands take a target specifier that refers to a domain or service\n"
+	       "within that domain. The available specifier forms are:\n"
+	       "\n"
+	       "system/[service-name]\n"
+	       "Targets the system-wide domain or service within. Root privileges are required\n"
+	       "to make modifications.\n"
+	       "\n"
+	       "user/<uid>/[service-name]\n"
+	       "Targets the user domain or service within. A process running as the target user\n"
+	       "may make modifications. Root may modify any user's domain. User domains do not\n"
+	       "exist on iOS.\n"
+	       "\n"
+	       "gui/<uid>/[service-name]\n"
+	       "Targets the GUI domain or service within. Each GUI domain is associated with a\n"
+	       "user domain, and a process running as the owner of that user domain may make\n"
+	       "modifications. Root may modify any GUI domain. GUI domains do not exist on iOS.\n"
+	       "\n"
+	       "session/<asid>/[service-name]\n"
+	       "Targets a session domain or service within. A process running within the target\n"
+	       "security audit session may make modifications. Root may modify any session\n"
+	       "domain.\n"
+	       "\n"
+	       "pid/<pid>/[service-name]\n"
+	       "Targets a process domain or service within. Only the process which owns the\n"
+	       "domain may modify it. Even root may not do so.\n"
+	       "\n"
+	       "When using a legacy subcommand which manipulates a domain, the target domain is\n"
+	       "assumed to be the system domain. On iOS, there is no support for per-user\n"
+	       "domains, even though there is a mobile user.\n",
+	    getprogname());
 	printf("\nSubcommands:\n");
-	int n = sizeof(cmds)/sizeof(cmds[0]);
+	int n = sizeof(cmds) / sizeof(cmds[0]);
 	for (int i = 0; i < n; i++) {
 		printf("\t%-16s%s\n", cmds[i].name, cmds[i].description);
 	}
@@ -217,6 +225,12 @@ int
 submit_cmd(xpc_object_t *msg, int argc, char **argv, char **envp, char **apple)
 {
 	return EDEPRECATED;
+}
+
+int
+uncache_cmd(xpc_object_t *msg, int argc, char **argv, char **envp, char **apple)
+{
+	return E2BIMPL;
 }
 
 int

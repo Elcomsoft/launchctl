@@ -25,11 +25,9 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#include <mach/mach.h>
 #include <stdint.h>
 #include <stdio.h>
-
-#include <mach/mach.h>
-
 #include <xpc/xpc.h>
 
 #ifndef _LAUNCHCTL_H_
@@ -41,6 +39,7 @@ typedef int cmd_main(xpc_object_t *, int, char **, char **, char **);
 cmd_main help_cmd;
 cmd_main config_cmd;
 cmd_main submit_cmd;
+cmd_main uncache_cmd;
 cmd_main todo_cmd; // Placeholder
 
 // version.c
@@ -61,6 +60,7 @@ cmd_main print_cmd;
 cmd_main print_cache_cmd;
 cmd_main print_disabled_cmd;
 cmd_main dumpstate_cmd;
+cmd_main dump_xsc_cmd;
 
 // env.c
 cmd_main setenv_cmd;
@@ -113,6 +113,20 @@ cmd_main userswitch_cmd;
 
 // limit.c
 cmd_main limit_cmd;
+
+// dumpjpcategory.c
+cmd_main dumpjpcategory_cmd;
+
+// procinfo.c
+cmd_main procinfo_cmd;
+cmd_main hostinfo_cmd;
+
+// resolveport.c
+cmd_main resolveport_cmd;
+
+// rem.c
+cmd_main enter_rem_cmd;
+cmd_main enter_rem_dev_cmd;
 
 void launchctl_xpc_object_print(xpc_object_t, const char *name, int level);
 int launchctl_send_xpc_to_launchd(uint64_t routine, xpc_object_t msg, xpc_object_t *reply);

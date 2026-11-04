@@ -7,6 +7,9 @@ launchctl
 a.out
 *.dSYM
 
+tools/*.txt
+.vscode
+
 compile_commands.json
 include
 
